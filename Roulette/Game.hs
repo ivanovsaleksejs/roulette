@@ -2,6 +2,7 @@ module Roulette.Game where
 
 import Data.List
 import Data.Tuple.Utils
+
 import System.Random
 
 import Roulette.Helpers
@@ -22,74 +23,77 @@ bets = [
         ("25..36", [25..36],   3)
     ]
 
-val = [
-        (1, 36),
-        (3, 12),
-        (6, 6)
-    ]
+numberBets = [1,3,6]
 
--- Game functions
 end s = putStrLn $ "Game ended: " ++ s
 
-quit s = any (flip isPrefixOf s) [":q", "q"]
+quit s = any (`isPrefixOf` s) [":q", "q", "exit"]
 
-game v m
-    | m <= 0    = end $ "\x1b[31m" ++ "You lost!" ++ "\x1b[0m"
-    | otherwise = nextBet v m
+game betSize money
+    | money <= 0      = end $ redLine "You lost!"
+    | betSize > money = do
+        putStrLn $ pinkLine $ "Money too low, bet value changed to " ++ (show money) ++ "!"
+        game money money
+    | otherwise       = do
+        putStrLn $ pinkLine $ "Money: " ++ (show money) ++ ". Bet value: " ++ (show betSize)
+        putStrLn "Enter your bet (to change amount of bet enter 'change <number>')"
+        input <- getLine
+        processInput betSize input money
 
-nextBet v m = do
-    if v > m
-        then do
-            putStrLn $ "\x1b[35m" ++ "Money too low, bet value changed to " ++ (show m) ++ "!" ++ "\x1b[0m"
-            nextBet m m
-        else do
-            putStrLn $ "\x1b[35m" ++ "Money: " ++ (show m) ++ ". Bet value:" ++ (show v) ++ "\x1b[0m"
-            putStrLn "Enter your bet (to change amount of bet enter change <number>)"
-            b <- getLine
-            processGame v b m
 
-processGame v b m
-    | quit b                                      = end "quit."
-    | b == ""                                     = wrong
-    | isPrefixOf "change" b                       = changeValue
-    | inl                                         = generateNumber v x m $ tripleLookup b bets snd3 []
-    | checkNumbers b && checkList b (map fst val) = generateNumber v x m s
-    | otherwise                                   = wrong
+processInput betSize input money
+    | quit input             = end "quit."
+    | change                 = changeValue
+    | simpleBet || numberBet = generateNumber betSize money winners quotient multiplier
+    | otherwise              = wrongInput
     where
-        change = isPrefixOf "change" b
-        inl    = inList b bets
-        s      = toNumbers b
-
-        wrong = do
-            putStrLn $ "\x1b[31m" ++ "Wrong bet!" ++ "\x1b[0m"
-            nextBet v m
-
-        x
-            | inl       = tripleLookup b bets thd3 0
-            | otherwise = myLookup (length s) val 0
+        change    = isPrefixOf "change" input
 
         changeValue
-            | validValue = nextBet newVal' m
-            | otherwise  = wrong
+            | validValue = game newValNum money
+            | otherwise  = wrongInput
             where
-                newVal     = drop 1 $ dropWhile (/= ' ') b
-                newVal'    = read newVal :: Int
-                validValue = isNumber newVal && newVal' >= 1 && newVal' <= m
+                newVal     = dropWhile (== ' ') $ dropWhile (/= ' ') input
+                newValNum  = read newVal :: Int
+                validValue = isNumber newVal && newValNum >= 1 && newValNum <= money
 
-generateNumber v b m l = do
-    w <- fmap (flip mod 37) randomIO
-    putStr $ "Number won: " ++ (show w) ++ " "
+        wrongInput = do
+            putStrLn $ redLine "Wrong input!"
+            game betSize money
 
-    if w == 0
+        simpleBet = inList input bets
+        numberBet = checkNumbers input && checkList input numberBets
+
+        numbers  = toNumbers input
+        winners
+            | simpleBet = tripleLookup input bets snd3 []
+            | numberBet = numbers
+
+        quotient
+            | simpleBet = tripleLookup input bets thd3 0
+            | otherwise = 36
+
+        multiplier
+            | simpleBet = 1
+            | otherwise = length numbers
+
+
+generateNumber betSize money winners quotient multiplier = do
+    gen <- fmap (`mod` 37) randomIO
+    putStr $ "Number won: " ++ (show gen) ++ " "
+
+    if gen == 0
         then putStrLn ""
         else do
-            if elem w reds then putStr ("\x1b[31m" ++ "red" ++ "\x1b[0m") else putStr "black"
-            if odd w then putStrLn " odd" else putStrLn " even"
+            if elem gen reds then putStr (redLine "red") else putStr "black"
+            if odd gen then putStrLn " odd" else putStrLn " even"
 
-    if elem w l
+    if elem gen winners
         then do
-            putStrLn $ "\x1b[32m" ++ "You won" ++ "\x1b[0m"
-            game v $ m + (b - 1) * v
+            let w = (quotient - multiplier) * betSize
+            putStrLn $ greenLine $ "You won " ++ (show w)
+            game betSize $ money + w
         else do
-            putStrLn $ "\x1b[31m" ++ "You lost" ++ "\x1b[0m"
-            game v $ m - v
+            let l = betSize * multiplier
+            putStrLn $ redLine "You lost"
+            game betSize $ money - l

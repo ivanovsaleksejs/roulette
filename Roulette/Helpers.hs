@@ -1,41 +1,40 @@
 module Roulette.Helpers where
 
 import Data.Char hiding (isNumber)
+import Data.List
 import Data.Tuple.Utils
 
--- Helper functions
---
--- Check if argument is index in list of triples
-inList :: Eq a => a -> [(a, b, c)] -> Bool
-inList = any . (. fst3) . (==)
+-- Helpers
 
--- Split string by comma and convert to Int
-toNumbers = map (\x -> read x :: Int) . splitBy ','
-
-isNumber = all isDigit
+-- Check if all symbols in string are digits
+isNumber n = n /= "" && all isDigit n
 
 -- Check if string is numbers separated by comma
 checkNumbers = all isNumber . splitBy ','
 
--- Find index in list of triples and execute function on that triple
-tripleLookup _ [] _ z = z
-tripleLookup a (l:ls) f z
-    | fst3 l == a = f l
-    | otherwise   = tripleLookup a ls f z
-
--- Check if number count is 1, 3 or 6 and all numbers are in [1..36]
-checkList l lengths = (length l') `elem` lengths && all (flip elem [0..36]) l'
-    where l' = toNumbers l
+-- Split string by comma and convert to Int
+toNumbers = nub . map (\x -> read x :: Int) . splitBy ','
 
 -- Split string by delimiter
-splitBy delimiter = foldr f [[]]
+splitBy delimiter = foldr checkDelimiter [[]]
     where
-        f c l@(x:xs)
+        checkDelimiter c l@(x:xs)
             | c == delimiter = [] : l
             | otherwise      = (c:x) : xs
 
--- Non-contexted lookup with default value
-myLookup a [] z = z
-myLookup a (l:ls) z
-    | fst l == a = snd l
-    | otherwise  = myLookup a ls z
+-- Check if number count is within allowed lengths and all numbers are in [0..36]
+checkList l lengths = (length parsedList) `elem` lengths && all (`elem` [0..36]) parsedList
+    where parsedList = toNumbers l
+
+              -- Check if argument is index in list of triples
+inList :: Eq a => a -> [(a, b, c)] -> Bool
+inList index = any (\ x -> index == fst3 x)
+
+-- Find index in list of triples and execute function on that triple
+tripleLookup _ [] _ def = def
+tripleLookup index (l:ls) fn def
+    | fst3 l == index = fn l
+    | otherwise       = tripleLookup index ls fn def
+
+colorLine color line = "\x1b[" ++ color ++ "m" ++ line ++ "\x1b[0m"
+[redLine, greenLine, pinkLine] = map colorLine ["31", "32", "35"]

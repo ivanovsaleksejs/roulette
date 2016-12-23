@@ -1,7 +1,7 @@
-import Data.Char hiding (isNumber)
-
 import Roulette.Helpers
 import Roulette.Game
+
+main = gameStart
 
 -- Main cycle
 gameStart = do
@@ -13,7 +13,5 @@ gameStart = do
             if isNumber m
                 then game 1 $ read m
                 else do
-                    putStrLn $ "\x1b[31m" ++ "Wrong input!" ++ "\x1b[0m"
+                    putStrLn $ redLine "Wrong input!"
                     gameStart
-
-main = gameStart
